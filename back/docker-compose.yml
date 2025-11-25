@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  chainqa_offchain_demo:
+    image: chainqa:latest
+    ports:
+      - "9000:9000"
+    # restart: 
+    # 如果你的应用需要在后台运行，你可以添加以下命令
+    volumes:
+      - ./chainConfig:/app/chain/chainConfig  # 本地路径:容器内路径
+    # command: /chainqa_offchain_demo conf/config.ini
+    command: go run main.go conf/config.ini
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # host-gateway是Docker内置值，自动映射宿主机IP
