@@ -8,6 +8,22 @@
       <t-button @click="saveUserId">设置ID</t-button>
     </div> -->
 
+    <div class="org-role-panel">
+      <div class="org-role-inputs">
+        <div class="input-block">
+          <span class="input-label">组织ID</span>
+          <t-input v-model="orgIdInput" placeholder="请输入组织ID" />
+        </div>
+        <div class="input-block">
+          <span class="input-label">角色</span>
+          <t-input v-model="roleInput" placeholder="请输入角色" />
+        </div>
+      </div>
+      <t-button class="confirm-btn" theme="primary" @click="saveOrgRole">
+        确定
+      </t-button>
+    </div>
+
     <t-typography-title level="h5" style="color: #0052d9">
       <span style="color: #0052d9">请选择操作</span>
     </t-typography-title>
@@ -31,12 +47,12 @@
     </div>
     <div class="choose">
       <t-card
-        class="option-card"
+        class="option-card domain-card"
         hover-shadow
-        @click="routeTo('download')"
-        subtitle="从IPFS上下载文件，若已知AES密钥可解密"
+        @click="routeTo('domain')"
+        subtitle="数据域相关操作，包括新建、查询、管理"
       >
-        <template #title>下载文件</template>
+        <template #title>数据域</template>
       </t-card>
       <t-card
         class="option-card"
@@ -54,17 +70,26 @@
 
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
+import { storeToRefs } from "pinia";
 import { useUserStore } from "../stores/user";
 import router from "../router";
 import { MessagePlugin } from "tdesign-vue-next";
 import UserIdCheckAndSetDialog from "../components/UserIdCheckAndSetDialog.vue";
 
 const userStore = useUserStore();
+const { orgId, role } = storeToRefs(userStore);
 const uId = ref("");
+const orgIdInput = ref(orgId.value);
+const roleInput = ref(role.value);
 
 const saveUserId = () => {
   userStore.setUserId(uId.value);
+};
+
+const saveOrgRole = () => {
+  userStore.setOrgRole(orgIdInput.value.trim(), roleInput.value.trim());
+  MessagePlugin.success("组织ID与角色已更新");
 };
 
 const routeTo = (name_) => {
@@ -92,12 +117,52 @@ const UserIdCheckAndSetDialogRef = ref(null);
 onMounted(() => {
   UserIdCheckAndSetDialogRef.value.checkAndShowUserIdSetDialog();
 });
+
+watch(
+  [orgId, role],
+  ([newOrgId, newRole]) => {
+    orgIdInput.value = newOrgId;
+    roleInput.value = newRole;
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>
 .home {
   margin: 20px auto;
   width: 30%;
+}
+
+.org-role-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.org-role-inputs {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.input-block {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.input-label {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.confirm-btn {
+  align-self: flex-start;
 }
 
 .input-container {
@@ -120,5 +185,17 @@ onMounted(() => {
   width: 200px;
   cursor: pointer;
   text-align: center;
+}
+
+.domain-card {
+  display: flex;
+}
+
+.domain-card :deep(.t-card__wrapper) {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 </style>

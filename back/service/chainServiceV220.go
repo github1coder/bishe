@@ -286,10 +286,10 @@ func GetAllQueryLogByTimestamp(contractName string, chainServiceUrl string, star
 	return ExecBlockchain(chainServiceUrl, jsonData)
 }
 
-func CreateDomain(contractName string, chainServiceUrl string, name string, accessPolicy string, orgId string) error {
+func CreateDomain(contractName string, chainServiceUrl string, name string, orgId string) error {
 	// ====================== 构造响应 ======================
 	if chainServiceUrl == "" {
-		return CreateDomain4Chainmaker(contractName, name, accessPolicy, orgId)
+		return CreateDomain4Chainmaker(contractName, chainServiceUrl, name, orgId)
 	}
 
 	// 创建请求数据
@@ -297,9 +297,8 @@ func CreateDomain(contractName string, chainServiceUrl string, name string, acce
 		ContractName: contractName,
 		MethodName:   "createDomain",
 		Args: map[string]interface{}{
-			"name":         name,
-			"accessPolicy": accessPolicy,
-			"orgId":        orgId,
+			"name":  name,
+			"orgId": orgId,
 		},
 	}
 
@@ -310,13 +309,14 @@ func CreateDomain(contractName string, chainServiceUrl string, name string, acce
 		return errors.New("转换JSON失败" + err.Error())
 	}
 
-	return ExecBlockchain(chainServiceUrl, jsonData)
+	_, err = ExecBlockchain(chainServiceUrl, jsonData)
+	return err
 }
 
 func UpdateDomainMetadata(contractName string, chainServiceUrl string, name string, newMembers string, newPolicy string, orgId string) error {
 	// ====================== 构造响应 ======================
 	if chainServiceUrl == "" {
-		return UpdateDomainMetadata4Chainmaker(contractName, name, newMembers, newPolicy, orgId)
+		return UpdateDomainMetadata4Chainmaker(contractName, chainServiceUrl, name, newMembers, newPolicy, orgId)
 	}
 
 	// 创建请求数据
@@ -338,13 +338,14 @@ func UpdateDomainMetadata(contractName string, chainServiceUrl string, name stri
 		return errors.New("转换JSON失败" + err.Error())
 	}
 
-	return ExecBlockchain(chainServiceUrl, jsonData)
+	_, err = ExecBlockchain(chainServiceUrl, jsonData)
+	return err
 }
 
 func CheckAccess(contractName string, chainServiceUrl string, name string, action string, orgId string, role string) (bool, error) {
 	// ====================== 构造响应 ======================
 	if chainServiceUrl == "" {
-		return CheckAccess4Chainmaker(contractName, name, action, orgId, role)
+		return CheckAccess4Chainmaker(contractName, chainServiceUrl, name, action, orgId, role)
 	}
 
 	// 创建请求数据
@@ -367,7 +368,12 @@ func CheckAccess(contractName string, chainServiceUrl string, name string, actio
 		return false, errors.New("转换JSON失败" + err.Error())
 	}
 
-	return ExecBlockchain(chainServiceUrl, jsonData)
+	result, err := ExecBlockchain(chainServiceUrl, jsonData)
+	if err != nil {
+		return false, err
+	}
+	// 解析结果，判断是否为 true
+	return result == "true" || result == "True" || result == "1", nil
 }
 
 func QueryMyDomains(contractName string, chainServiceUrl string, orgId string) (string, error) {
@@ -422,10 +428,10 @@ func QueryMyManagedDomains(contractName string, chainServiceUrl string, orgId st
 	return ExecBlockchain(chainServiceUrl, jsonData)
 }
 
-func QueryDomainInfo(contractName string, chainServiceUrl string, domainName string, orgId string) (string, error) {
+func QueryDomainInfo(contractName string, chainServiceUrl string, name string, orgId string) (string, error) {
 	// ====================== 构造响应 ======================
 	if chainServiceUrl == "" {
-		return QueryDomainInfo4Chainmaker(contractName, domainName, orgId)
+		return QueryDomainInfo4Chainmaker(contractName, chainServiceUrl, name, orgId)
 	}
 
 	// 创建请求数据
@@ -433,8 +439,8 @@ func QueryDomainInfo(contractName string, chainServiceUrl string, domainName str
 		ContractName: contractName,
 		MethodName:   "queryDomainInfo",
 		Args: map[string]interface{}{
-			"domainName": domainName,
-			"orgId":      orgId,
+			"name":  name,
+			"orgId": orgId,
 		},
 	}
 

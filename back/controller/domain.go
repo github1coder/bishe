@@ -30,7 +30,7 @@ func CreateDomainHandler(c *gin.Context) {
 
 func createDomain(req DomainDTO, c *gin.Context) {
 	fmt.Println("createDomain")
-	err := service.CreateDomain(req.ApiUrl.ContractName, req.ApiUrl.ChainServiceUrl, req.DomainName, req.DomainPolicy, req.OrgId)
+	err := service.CreateDomain(req.ApiUrl.ContractName, req.ApiUrl.ChainServiceUrl, req.DomainName, req.OrgId)
 	if err != nil {
 		models.ResponseError400(c, http.StatusBadRequest, "创建数据域失败", err)
 		return

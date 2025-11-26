@@ -30,7 +30,8 @@ func main() {
 		return
 	}
 
-	chainClient, err := chain.InitChainClient("")
+	// chainClient, err := chain.InitChainClient("")
+	_, err := chain.InitChainClient("")
 	if err != nil {
 		log.Fatalf("初始化链客户端失败: %v", err)
 	}

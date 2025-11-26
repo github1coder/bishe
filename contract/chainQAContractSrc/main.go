@@ -28,6 +28,8 @@ func (f *ChainQA) InvokeContract(method string) protogo.Response {
 		return f.getPK()
 	case "updateDataDigtalEnvelop":
 		return f.updateDataDigtalEnvelop()
+	case "updateDataDigtalEnvelopWithDomain":
+		return f.updateDataDigtalEnvelopWithDomain()
 	case "getAesKey":
 		return f.getAesKey()
 	case "updateQueryLog":
@@ -423,9 +425,8 @@ func (f *ChainQA) createDomain() protogo.Response {
 	args := sdk.Instance.GetArgs()
 	domainID := "DOMAIN_" + string(args["name"])
 	name := string(args["name"])
-	policyJson := string(args["accessPolicy"])
 
-	if domainID == "DOMAIN_" || name == "" || policyJson == "" {
+	if domainID == "DOMAIN_" || name == "" {
 		return sdk.Error("Missing required parameters")
 	}
 
@@ -445,19 +446,12 @@ func (f *ChainQA) createDomain() protogo.Response {
 		return sdk.Error("Domain already exists")
 	}
 
-	// 4. 解析策略并构建对象
-	var policy AccessPolicy
-	if err := json.Unmarshal([]byte(policyJson), &policy); err != nil {
-		return sdk.Error("Invalid access policy format")
-	}
-
 	domain := TrustedDataDomain{
-		DomainID:     domainID,
-		OwnerMSP:     senderOrgId,
-		Name:         name,
-		Members:      []string{senderOrgId},
-		AccessPolicy: policy,
-		Status:       "Active",
+		DomainID: domainID,
+		OwnerMSP: senderOrgId,
+		Name:     name,
+		Members:  []string{senderOrgId},
+		Status:   "Active",
 	}
 
 	// 5. 序列化并存储
@@ -471,9 +465,9 @@ func (f *ChainQA) createDomain() protogo.Response {
 		return sdk.Error("PutState error")
 	}
 
-	// 6. 发送事件
-	sdk.Instance.EmitEvent("CreateDomainEvent", []string{domainID, senderOrgId})
-	sdk.Instance.Log(fmt.Sprintf("Domain %s created by %s", domainID, senderOrgId))
+	// // 6. 发送事件
+	// sdk.Instance.EmitEvent("CreateDomainEvent", []string{domainID, senderOrgId})
+	// sdk.Instance.Log(fmt.Sprintf("Domain %s created by %s", domainID, senderOrgId))
 
 	return sdk.Success([]byte(domainID))
 }
@@ -632,9 +626,7 @@ func (f *ChainQA) queryMyDomains() protogo.Response {
 	}
 
 	// 2. 创建迭代器 (NewIterator)
-	// 参数 startKey="" 和 limitKey="" 表示遍历合约命名空间下的所有Key
-	// 注意：在实际生产中，建议为数据域Key增加前缀（如 "DOMAIN_"），此处对应使用 NewIterator("DOMAIN_", "DOMAIN_~")
-	iter, err := sdk.Instance.NewIterator("DOMAIN_", "DOMAIN_~")
+	iter, err := sdk.Instance.NewIteratorPrefixWithKey("DOMAIN_")
 	if err != nil {
 		return sdk.Error("Failed to create iterator: " + err.Error())
 	}
@@ -644,25 +636,24 @@ func (f *ChainQA) queryMyDomains() protogo.Response {
 
 	// 3. 循环遍历
 	for iter.HasNext() {
-		kv, err := iter.Next()
-		if err != nil {
-			return sdk.Error("Iterator error: " + err.Error())
+		kvkey, _, kvvalue, err := iter.Next()
+		if err != nil || kvkey == "" || kvvalue == nil {
+			continue
 		}
 
 		// 容错处理：跳过空值
-		if len(kv.Value) == 0 {
+		if len(kvvalue) == 0 {
 			continue
 		}
 
 		// 4. 解析数据域对象
 		var domain TrustedDataDomain
 		// 如果合约中存储了非TrustedDataDomain结构的数据，这里会解析失败，需跳过
-		if err := json.Unmarshal(kv.Value, &domain); err != nil {
+		if err := json.Unmarshal(kvvalue, &domain); err != nil {
 			// 记录日志方便调试，但不中断流程
-			sdk.Instance.Log(fmt.Sprintf("Skip invalid data for key %s", kv.Key))
+			sdk.Instance.Log(fmt.Sprintf("Skip invalid data for key %s", kvkey))
 			continue
 		}
-
 		// 5. 检查权限：判断当前OrgId是否在Members列表中
 		isMember := false
 		for _, member := range domain.Members {
@@ -697,9 +688,7 @@ func (f *ChainQA) queryMyManagedDomains() protogo.Response {
 	}
 
 	// 2. 创建迭代器 (NewIterator)
-	// 参数 startKey="" 和 limitKey="" 表示遍历合约命名空间下的所有Key
-	// 注意：在实际生产中，建议为数据域Key增加前缀（如 "DOMAIN_"），此处对应使用 NewIterator("DOMAIN_", "DOMAIN_~")
-	iter, err := sdk.Instance.NewIterator("DOMAIN_", "DOMAIN_~")
+	iter, err := sdk.Instance.NewIteratorPrefixWithKey("DOMAIN_")
 	if err != nil {
 		return sdk.Error("Failed to create iterator: " + err.Error())
 	}
@@ -709,22 +698,22 @@ func (f *ChainQA) queryMyManagedDomains() protogo.Response {
 
 	// 3. 循环遍历
 	for iter.HasNext() {
-		kv, err := iter.Next()
-		if err != nil {
-			return sdk.Error("Iterator error: " + err.Error())
+		kvkey, _, kvvalue, err := iter.Next()
+		if err != nil || kvkey == "" || kvvalue == nil {
+			continue
 		}
 
 		// 容错处理：跳过空值
-		if len(kv.Value) == 0 {
+		if len(kvvalue) == 0 {
 			continue
 		}
 
 		// 4. 解析数据域对象
 		var domain TrustedDataDomain
 		// 如果合约中存储了非TrustedDataDomain结构的数据，这里会解析失败，需跳过
-		if err := json.Unmarshal(kv.Value, &domain); err != nil {
+		if err := json.Unmarshal(kvvalue, &domain); err != nil {
 			// 记录日志方便调试，但不中断流程
-			sdk.Instance.Log(fmt.Sprintf("Skip invalid data for key %s", kv.Key))
+			sdk.Instance.Log(fmt.Sprintf("Skip invalid data for key %s", kvkey))
 			continue
 		}
 
@@ -747,7 +736,7 @@ func (f *ChainQA) queryMyManagedDomains() protogo.Response {
 // 查询domainName的详细信息，并验证权限
 func (f *ChainQA) queryDomainInfo() protogo.Response {
 	args := sdk.Instance.GetArgs()
-	domainID := "DOMAIN_" + string(args["domainName"])
+	domainID := "DOMAIN_" + string(args["name"])
 	if domainID == "DOMAIN_" {
 		return sdk.Error("domainName is required")
 	}

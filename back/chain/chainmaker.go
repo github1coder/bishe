@@ -65,7 +65,8 @@ func getFinalConfigPath(configPath string) string {
 
 // 初始化链客户端
 func InitChainClient(configPath string) (*sdk.ChainClient, error) {
-	configPath := getFinalConfigPath(configPath)
+	configPath = getFinalConfigPath(configPath)
+	var err error
 	client, err = sdk.NewChainClient(sdk.WithConfPath(configPath), sdk.WithChainClientLogger(getLogger()))
 	if err != nil {
 		return nil, err

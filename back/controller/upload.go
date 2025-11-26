@@ -270,10 +270,10 @@ func uploadHandlerWithDomain(req UploadFileDTOWithDomain, c *gin.Context) {
 	fmt.Println("开始上传数字信封到区块链")
 	// 将数字信封上传到区块链
 	var dataDigtalEnvelop DataDigtalEnvelop
-	dataDigtalEnvelop := DataDigtalEnvelop{
-		Uid:         str(req.Uid),
-		Pos:         str(cid),
-		Envelop:     str(Envelope),
+	dataDigtalEnvelop = DataDigtalEnvelop{
+		Uid:         req.Uid,
+		Pos:         cid,
+		Envelop:     Envelope,
 		Name:        req.Name,
 		Age:         int(req.Age),
 		Gender:      req.Gender,

@@ -84,7 +84,11 @@ func UploadEnvelopeToBlockchainWithDomain4Chainmaker(contractName string, envelo
 		},
 	}
 
-	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+	_, err := ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func GetAesKeyFromBlockchain4Chainmaker(contractName string, chainServiceUrl string, pos string) (string, error) {
@@ -164,7 +168,7 @@ func GetAllQueryLogByTimestamp4Chainmaker(contractName string, chainServiceUrl s
 	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
 }
 
-func CreateDomain4Chainmaker(contractName string, chainServiceUrl string, name string, accessPolicy string, orgId string) error {
+func CreateDomain4Chainmaker(contractName string, chainServiceUrl string, name string, orgId string) error {
 	// ====================== 构造响应 ======================
 
 	// 创建请求数据
@@ -172,15 +176,18 @@ func CreateDomain4Chainmaker(contractName string, chainServiceUrl string, name s
 		ContractName: contractName,
 		MethodName:   "createDomain",
 		Args: map[string]interface{}{
-			"name":         name,
-			"accessPolicy": accessPolicy,
-			"orgId":        orgId,
+			"name":  name,
+			"orgId": orgId,
 		},
 	}
 
 	// ======================= 发送请求 ======================
 
-	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+	_, err := ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func UpdateDomainMetadata4Chainmaker(contractName string, chainServiceUrl string, name string, newMembers string, newPolicy string, orgId string) error {
@@ -200,7 +207,11 @@ func UpdateDomainMetadata4Chainmaker(contractName string, chainServiceUrl string
 
 	// ======================= 发送请求 ======================
 
-	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+	_, err := ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func CheckAccess4Chainmaker(contractName string, chainServiceUrl string, name string, action string, orgId string, role string) (bool, error) {
@@ -220,7 +231,12 @@ func CheckAccess4Chainmaker(contractName string, chainServiceUrl string, name st
 
 	// ======================= 发送请求 ======================
 
-	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+	result, err := ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+	if err != nil {
+		return false, err
+	}
+	// 解析结果，判断是否为 true
+	return result == "true" || result == "True" || result == "1", nil
 }
 
 func QueryMyDomains4Chainmaker(contractName string, chainServiceUrl string, orgId string) (string, error) {
@@ -254,7 +270,7 @@ func QueryMyManagedDomains4Chainmaker(contractName string, chainServiceUrl strin
 	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
 }
 
-func QueryDomainInfo4Chainmaker(contractName string, chainServiceUrl string, domainName string, orgId string) (string, error) {
+func QueryDomainInfo4Chainmaker(contractName string, chainServiceUrl string, name string, orgId string) (string, error) {
 	// ====================== 构造响应 ======================
 
 	// 创建请求数据
@@ -262,8 +278,8 @@ func QueryDomainInfo4Chainmaker(contractName string, chainServiceUrl string, dom
 		ContractName: contractName,
 		MethodName:   "queryDomainInfo",
 		Args: map[string]interface{}{
-			"domainName": domainName,
-			"orgId":      orgId,
+			"name":  name,
+			"orgId": orgId,
 		},
 	}
 	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)

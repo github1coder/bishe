@@ -1,0 +1,11 @@
+2025-11-26 22:12:01.138	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-11-26 22:12:48.020	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-11-26 22:17:39.261	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-11-26 22:17:52.387	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-11-26 22:19:00.520	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-11-26 22:19:19.175	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-11-26 22:26:33.789	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-11-26 22:45:05.012	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-11-26 22:45:39.622	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-11-26 22:53:17.329	[DEBUG]	[SDK]	v2@v2.3.7/sdk_user_contract.go:170	[SDK] begin to INVOKE contract, [contractName:chainqa]/[method:getPk]/[txId:]/[params:[]]
+2025-11-26 22:53:17.526	[DEBUG]	[SDK]	v2@v2.3.7/sdk_common.go:57	[SDK] begin to QUERY system contract, [method:GET_TX_BY_TX_ID]/[txId:187b962c98ba0b50ca7d27b1dcac2c254ff46f1384b24bd18e3b54fa58dad730]
