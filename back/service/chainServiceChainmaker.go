@@ -1,24 +1,21 @@
 package service
 
 import (
-	
 	"errors"
-	
+
+	"chainqa_offchain_demo/chain"
 	"strconv"
 	"strings"
-	"chainqa_offchain_demo/chain"
-	
 )
 
-
 // ExecBlockchain4Chainmaker 执行区块链操作
-func ExecBlockchain4Chainmaker(contractName string, method string,  params map[string]interface{}) (string, error) {
+func ExecBlockchain4Chainmaker(contractName string, method string, params map[string]interface{}) (string, error) {
 	// 将params map[string]interface{}转换为map[string]string
 	mapParams := make(map[string]string)
 	for k, v := range params {
 		mapParams[k] = v.(string)
 	}
-	resp := chain.InvokeContract(contractName,method,mapParams)
+	resp := chain.InvokeContract(contractName, method, mapParams)
 	// resp是chainmakerResult
 	// 判断resp.ContractResult.Message和resp.ContractResult.Result是否同时存在，若有一方不存在，返回错误
 	if resp.ContractResult.Message == "" || resp.ContractResult.Result == "" {
@@ -28,8 +25,8 @@ func ExecBlockchain4Chainmaker(contractName string, method string,  params map[s
 	// 判断resp.message是否为success（大小写均可）
 	if strings.ToLower(resp.ContractResult.Message) != "success" {
 		return "", errors.New(resp.ContractResult.Result)
-	}else{
-		
+	} else {
+
 		return string(resp.ContractResult.Result), nil
 	}
 }
@@ -37,18 +34,17 @@ func ExecBlockchain4Chainmaker(contractName string, method string,  params map[s
 // ------------------------ 以下为业务函数 ------------------------
 func GetPublicKeyFromBlockchain4Chainmaker(contractName string) (string, error) {
 	// ====================== 构造响应 ======================
-	
+
 	// 创建请求数据
 	data := chainDTO{
 		ContractName: contractName,
 		MethodName:   "getPk",
-		Args:        	map[string]interface{}{
+		Args:         map[string]interface{}{
 			// "file_prefix_path": contractName,
 		},
 	}
 
 	// ======================= 发送请求 ======================
-	
 
 	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
 
@@ -56,7 +52,6 @@ func GetPublicKeyFromBlockchain4Chainmaker(contractName string) (string, error) 
 
 func UploadEnvelopeToBlockchain4Chainmaker(contractName string, envelope string, cid string, uId string) error {
 	// ====================== 构造响应 ======================
-	
 
 	// 创建请求数据
 	data := chainDTO{
@@ -71,16 +66,30 @@ func UploadEnvelopeToBlockchain4Chainmaker(contractName string, envelope string,
 	}
 
 	// ======================= 发送请求 ======================
-	_,err := ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+	_, err := ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+func UploadEnvelopeToBlockchainWithDomain4Chainmaker(contractName string, envelopJsonStr string) error {
+	// ====================== 构造响应 ======================
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "updateDataDigtalEnvelopWithDomain",
+		Args: map[string]interface{}{
+			"envelop": envelopJsonStr,
+		},
+	}
+
+	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+}
+
 func GetAesKeyFromBlockchain4Chainmaker(contractName string, chainServiceUrl string, pos string) (string, error) {
 	// ====================== 构造响应 ======================
-	
+
 	// 创建请求数据
 	data := chainDTO{
 		ContractName: contractName,
@@ -97,7 +106,6 @@ func GetAesKeyFromBlockchain4Chainmaker(contractName string, chainServiceUrl str
 // UpdateQueryLog 更新查询日志
 func UpdateQueryLog4Chainmaker(contractName string, chainServiceUrl string, uId string, queryItem string, queryStatus int, queryResult string) error {
 	// ====================== 构造响应 ======================
-	
 
 	queryStatusStr := strconv.Itoa(queryStatus)
 
@@ -114,7 +122,6 @@ func UpdateQueryLog4Chainmaker(contractName string, chainServiceUrl string, uId 
 	}
 
 	// ======================= 发送请求 ======================
-	
 
 	_, err := ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
 	if err != nil {
@@ -142,7 +149,6 @@ func GetAllQueryLogByUid4Chainmaker(contractName string, chainServiceUrl string,
 
 func GetAllQueryLogByTimestamp4Chainmaker(contractName string, chainServiceUrl string, startTime string, endTime string) (string, error) {
 	// ====================== 构造响应 ======================
-	
 
 	// 创建请求数据
 	data := chainDTO{
@@ -155,5 +161,110 @@ func GetAllQueryLogByTimestamp4Chainmaker(contractName string, chainServiceUrl s
 	}
 
 	// ======================= 发送请求 ======================
+	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+}
+
+func CreateDomain4Chainmaker(contractName string, chainServiceUrl string, name string, accessPolicy string, orgId string) error {
+	// ====================== 构造响应 ======================
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "createDomain",
+		Args: map[string]interface{}{
+			"name":         name,
+			"accessPolicy": accessPolicy,
+			"orgId":        orgId,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+
+	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+}
+
+func UpdateDomainMetadata4Chainmaker(contractName string, chainServiceUrl string, name string, newMembers string, newPolicy string, orgId string) error {
+	// ====================== 构造响应 ======================
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "updateDomainMetadata",
+		Args: map[string]interface{}{
+			"name":       name,
+			"newMembers": newMembers,
+			"newPolicy":  newPolicy,
+			"orgId":      orgId,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+
+	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+}
+
+func CheckAccess4Chainmaker(contractName string, chainServiceUrl string, name string, action string, orgId string, role string) (bool, error) {
+	// ====================== 构造响应 ======================
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "checkAccess",
+		Args: map[string]interface{}{
+			"name":   name,
+			"action": action,
+			"orgId":  orgId,
+			"role":   role,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+
+	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+}
+
+func QueryMyDomains4Chainmaker(contractName string, chainServiceUrl string, orgId string) (string, error) {
+	// ====================== 构造响应 ======================
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "queryMyDomains",
+		Args: map[string]interface{}{
+			"orgId": orgId,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+
+	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+}
+
+func QueryMyManagedDomains4Chainmaker(contractName string, chainServiceUrl string, orgId string) (string, error) {
+	// ====================== 构造响应 ======================
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "queryMyManagedDomains",
+		Args: map[string]interface{}{
+			"orgId": orgId,
+		},
+	}
+	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
+}
+
+func QueryDomainInfo4Chainmaker(contractName string, chainServiceUrl string, domainName string, orgId string) (string, error) {
+	// ====================== 构造响应 ======================
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "queryDomainInfo",
+		Args: map[string]interface{}{
+			"domainName": domainName,
+			"orgId":      orgId,
+		},
+	}
 	return ExecBlockchain4Chainmaker(data.ContractName, data.MethodName, data.Args)
 }

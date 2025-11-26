@@ -1,10 +1,34 @@
 version: '3.8'
 
 services:
+  # Redis 服务
+  redis:
+    image: redis:7-alpine
+    container_name: chainqa_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      # 挂载 Redis 配置文件
+      - ./conf/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      # 挂载数据目录（持久化数据）
+      - redis_data:/data
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - chainqa_network
+
   chainqa_offchain_demo:
     image: chainqa:latest
     ports:
       - "9000:9000"
+    depends_on:
+      redis:
+        condition: service_healthy
     # restart: 
     # 如果你的应用需要在后台运行，你可以添加以下命令
     volumes:
@@ -13,3 +37,15 @@ services:
     command: go run main.go conf/config.ini
     extra_hosts:
       - "host.docker.internal:host-gateway"  # host-gateway是Docker内置值，自动映射宿主机IP
+    networks:
+      - chainqa_network
+
+# 数据卷定义（用于 Redis 持久化）
+volumes:
+  redis_data:
+    driver: local
+
+# 网络定义
+networks:
+  chainqa_network:
+    driver: bridge

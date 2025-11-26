@@ -140,6 +140,36 @@ func UploadEnvelopeToBlockchain(contractName string, chainServiceUrl string, env
 	return nil
 }
 
+func UploadEnvelopeToBlockchainWithDomain(contractName string, chainServiceUrl string, envelopJsonStr string) error {
+	// ====================== 构造响应 ======================
+	if chainServiceUrl == "" {
+		// chainServiceUrl = "http://host.docker.internal:9001/tencent-chainapi/exec"
+		return UploadEnvelopeToBlockchainWithDomain4Chainmaker(contractName, envelopJsonStr)
+	}
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "updateDataDigtalEnvelopWithDomain",
+		Args: map[string]interface{}{
+			"envelop": envelopJsonStr,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+	// 将结构体转换为JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return errors.New("转换JSON失败" + err.Error())
+	}
+
+	_, err = ExecBlockchain(chainServiceUrl, jsonData)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func GetAesKeyFromBlockchain(contractName string, chainServiceUrl string, pos string) (string, error) {
 	// ====================== 构造响应 ======================
 	if chainServiceUrl == "" {
@@ -250,6 +280,168 @@ func GetAllQueryLogByTimestamp(contractName string, chainServiceUrl string, star
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 
+		return "", errors.New("转换JSON失败" + err.Error())
+	}
+
+	return ExecBlockchain(chainServiceUrl, jsonData)
+}
+
+func CreateDomain(contractName string, chainServiceUrl string, name string, accessPolicy string, orgId string) error {
+	// ====================== 构造响应 ======================
+	if chainServiceUrl == "" {
+		return CreateDomain4Chainmaker(contractName, name, accessPolicy, orgId)
+	}
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "createDomain",
+		Args: map[string]interface{}{
+			"name":         name,
+			"accessPolicy": accessPolicy,
+			"orgId":        orgId,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+	// 将结构体转换为JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return errors.New("转换JSON失败" + err.Error())
+	}
+
+	return ExecBlockchain(chainServiceUrl, jsonData)
+}
+
+func UpdateDomainMetadata(contractName string, chainServiceUrl string, name string, newMembers string, newPolicy string, orgId string) error {
+	// ====================== 构造响应 ======================
+	if chainServiceUrl == "" {
+		return UpdateDomainMetadata4Chainmaker(contractName, name, newMembers, newPolicy, orgId)
+	}
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "updateDomainMetadata",
+		Args: map[string]interface{}{
+			"name":       name,
+			"newMembers": newMembers,
+			"newPolicy":  newPolicy,
+			"orgId":      orgId,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+	// 将结构体转换为JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return errors.New("转换JSON失败" + err.Error())
+	}
+
+	return ExecBlockchain(chainServiceUrl, jsonData)
+}
+
+func CheckAccess(contractName string, chainServiceUrl string, name string, action string, orgId string, role string) (bool, error) {
+	// ====================== 构造响应 ======================
+	if chainServiceUrl == "" {
+		return CheckAccess4Chainmaker(contractName, name, action, orgId, role)
+	}
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "checkAccess",
+		Args: map[string]interface{}{
+			"name":   name,
+			"action": action,
+			"orgId":  orgId,
+			"role":   role,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+	// 将结构体转换为JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+
+		return false, errors.New("转换JSON失败" + err.Error())
+	}
+
+	return ExecBlockchain(chainServiceUrl, jsonData)
+}
+
+func QueryMyDomains(contractName string, chainServiceUrl string, orgId string) (string, error) {
+	// ====================== 构造响应 ======================
+	if chainServiceUrl == "" {
+		// chainServiceUrl = "http://host.docker.internal:9001/tencent-chainapi/exec"
+		return QueryMyDomains4Chainmaker(contractName, chainServiceUrl, orgId)
+	}
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "queryMyDomains",
+		Args: map[string]interface{}{
+			"orgId": orgId,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+	// 将结构体转换为JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+
+		return "", errors.New("转换JSON失败" + err.Error())
+	}
+
+	return ExecBlockchain(chainServiceUrl, jsonData)
+}
+
+func QueryMyManagedDomains(contractName string, chainServiceUrl string, orgId string) (string, error) {
+	// ====================== 构造响应 ======================
+	if chainServiceUrl == "" {
+		return QueryMyManagedDomains4Chainmaker(contractName, chainServiceUrl, orgId)
+	}
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "queryMyManagedDomains",
+		Args: map[string]interface{}{
+			"orgId": orgId,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+	// 将结构体转换为JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return "", errors.New("转换JSON失败" + err.Error())
+	}
+
+	return ExecBlockchain(chainServiceUrl, jsonData)
+}
+
+func QueryDomainInfo(contractName string, chainServiceUrl string, domainName string, orgId string) (string, error) {
+	// ====================== 构造响应 ======================
+	if chainServiceUrl == "" {
+		return QueryDomainInfo4Chainmaker(contractName, domainName, orgId)
+	}
+
+	// 创建请求数据
+	data := chainDTO{
+		ContractName: contractName,
+		MethodName:   "queryDomainInfo",
+		Args: map[string]interface{}{
+			"domainName": domainName,
+			"orgId":      orgId,
+		},
+	}
+
+	// ======================= 发送请求 ======================
+	// 将结构体转换为JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
 		return "", errors.New("转换JSON失败" + err.Error())
 	}
 

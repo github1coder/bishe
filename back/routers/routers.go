@@ -58,6 +58,7 @@ func SetupRouter() *gin.Engine {
 		{
 			uploadGroup.POST("/getAesKey", controller.GetAesKeyHandler)
 			uploadGroup.POST("/uploadFile", controller.UploadFileHandler)
+			uploadGroup.POST("/uploadFileWithDomain", controller.UploadFileWithDomainHandler)
 			uploadGroup.POST("/uploadCSVFile", controller.UploadCSVFileHandler)
 			uploadGroup.POST("/uploadDataFileWithoutCheck", controller.UploadDataFileWithoutCheckHandler)
 		}
@@ -77,6 +78,15 @@ func SetupRouter() *gin.Engine {
 		{
 			logGroup.POST("/logByUid", controller.LogByUidHandler)
 			logGroup.POST("/logByTimeRange", controller.LogByTimeRangeHandler)
+		}
+
+		domainGroup := apiGroup.Group("/domain")
+		{
+			domainGroup.POST("/createDomain", controller.CreateDomainHandler)
+			domainGroup.POST("/updateDomainMetadata", controller.UpdateDomainMetadataHandler)
+			domainGroup.POST("/queryMyDomains", controller.QueryMyDomainsHandler)
+			domainGroup.POST("/queryMyManagedDomains", controller.QueryMyManagedDomainsHandler)
+			domainGroup.POST("/queryDomainInfo", controller.QueryDomainInfoHandler)
 		}
 	}
 
