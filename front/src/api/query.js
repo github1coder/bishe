@@ -25,3 +25,12 @@ export function queryData(qItem, fPoses) {
     })
 
 }
+
+export function queryByFields(queryParams) {
+    return request({
+        timeout: 60000,//60s超时
+        url: baseUrl + '/queryByFields',
+        method: 'post',
+        data: queryParams
+    })
+}

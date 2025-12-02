@@ -79,7 +79,7 @@
 
 <script setup>
 import { ref, reactive, defineExpose } from "vue";
-import { uploadFile } from "@/api/upload";
+import { uploadFile, uploadFileWithDomain } from "@/api/upload";
 import { downloadIPFSFile, tryDecryptFile } from "@/api/download";
 import { MessagePlugin } from "tdesign-vue-next";
 import DownloadIPFSModal from "./DownloadIPFSModal.vue";
@@ -93,7 +93,7 @@ const uploadingNowIdx = ref(0); // 正在上传的文件索引
 const failFileDataList = reactive([]);
 const successFileDataList = reactive([]);
 
-const PassData = async (jsonSuccessFileDataList) => {
+const PassData = async (jsonSuccessFileDataList, domainName) => {
   uploadStatus.value = "loading";
   loadingConfig.status = "active";
   uploadingNowIdx.value = 0;
@@ -107,10 +107,11 @@ const PassData = async (jsonSuccessFileDataList) => {
 
   for (let i = 0; i < fileDataList.length; i++) {
     uploadingNowIdx.value = i; // 正在上传的文件索引
-    let response = await uploadFile(
+    let response = await uploadFileWithDomain(
       fileDataList[i].aesKey,
       fileDataList[i].result,
-      fileDataList[i].name
+      fileDataList[i].name,
+      domainName
     ).catch((err) => {
       fileDataList[i].err =
         err?.response?.msg == null ? err?.response?.err : err?.response?.msg;
@@ -129,11 +130,13 @@ const PassData = async (jsonSuccessFileDataList) => {
     if (response?.code == 0) {
       fileDataList[i].ipfsPos = response.data.pos;
       successFileDataList.splice(0, 0, fileDataList[i]);
-    } else {
+    } else if (response) {
+      // response存在但code不是0
       fileDataList[i].err =
-        err?.response?.msg == null ? err?.response?.err : err?.response?.msg;
+        response?.msg == null ? response?.err : response?.msg;
       failFileDataList.splice(0, 0, fileDataList[i]);
     }
+    // 如果response是undefined，说明已经在catch中处理了
     // 等待3s
     await new Promise((resolve) => {
       setTimeout(() => {

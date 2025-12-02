@@ -152,7 +152,7 @@ func UploadEnvelopeToBlockchainWithDomain(contractName string, chainServiceUrl s
 		ContractName: contractName,
 		MethodName:   "updateDataDigtalEnvelopWithDomain",
 		Args: map[string]interface{}{
-			"envelop": envelopJsonStr,
+			"envelopJsonStr": envelopJsonStr,
 		},
 	}
 

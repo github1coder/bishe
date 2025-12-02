@@ -130,6 +130,16 @@ func matchesConditions(row string, tableHeaderMap map[string]int, conditions []Q
 
 		// 获取条件基准值
 		condVal := condition.Val
+
+		// 如果condition.Field为age，且condVal为0，则继续
+		if condition.Field == "age" && condVal == "0" {
+			continue
+		}
+		// 如果condition.Field为name、gender、hospital、department、diseaseCode，且condVal为空，则继续
+		if (condition.Field == "name" || condition.Field == "gender" || condition.Field == "hospital" || condition.Field == "department" || condition.Field == "diseaseCode") && condVal == "" {
+			continue
+		}
+
 		// 获取单元格值：根据表头获取到比较列的索引（从0开始），然后根据索引获取到单元格值
 
 		cellValue := cells[tableHeaderMap[condition.Pos+"_"+condition.Field]]

@@ -1,0 +1,8 @@
+2025-12-01 20:39:53.539	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-12-01 20:40:32.102	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-12-01 20:41:58.741	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-12-01 20:42:18.044	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-12-01 20:42:41.300	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls
+2025-12-01 20:43:17.997	[DEBUG]	[SDK]	v2@v2.3.7/sdk_user_contract.go:170	[SDK] begin to INVOKE contract, [contractName:z_test_chain]/[method:checkAccess]/[txId:]/[params:[key:"action" value:"write"  key:"orgId" value:"hospitalA"  key:"role" value:"doctor"  key:"name" value:"test1" ]]
+2025-12-01 20:43:18.061	[DEBUG]	[SDK]	v2@v2.3.7/sdk_common.go:57	[SDK] begin to QUERY system contract, [method:GET_TX_BY_TX_ID]/[txId:187d17fb82ca0be0ca21cae2988b2cc2212d2beffbba40e29211bd96c61a8f7c]
+2025-12-01 20:59:55.556	[DEBUG]	[SDK]	v2@v2.3.7/sdk_config.go:1173	[SDK] use tls

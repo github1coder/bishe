@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"chainqa_offchain_demo/models"
@@ -22,6 +23,9 @@ type IndexerService struct {
 	redisClient *redis.Client
 	ctx         context.Context
 }
+
+// GlobalIndexerService 全局索引服务实例
+var GlobalIndexerService *IndexerService
 
 // Global Bucket Config
 const (
@@ -84,6 +88,11 @@ func (s *IndexerService) processBlock(block *common.BlockInfo) {
 	hashIndexCache := make(map[string]map[string][]string)
 
 	for _, tx := range txs {
+		// 0. 过滤不相关的交易：只处理医疗数据相关的交易
+		if !isMedicalDataTx(tx) {
+			continue
+		}
+
 		// 1. 解析交易 Payload 获取医疗数据
 		// 假设 Payload 是 JSON 序列化的 OnChainRecord
 		record, err := parseTxPayload(tx)
@@ -108,22 +117,23 @@ func (s *IndexerService) processBlock(block *common.BlockInfo) {
 			Member: record.TxID,
 		})
 
-		// --- 处理 DiseaseCode\Name\Gender\Hospital\Department\Uid (等值型/字符型) ---
+		// --- 处理 DiseaseCode\Name\Gender\Hospital\Department\Uid\DomainID (等值型/字符型) ---
 		diseaseBucket := hashBucket(record.Metadata.DiseaseCode)
 		nameBucket := hashBucket(record.Metadata.Name)
 		genderBucket := hashBucket(record.Metadata.Gender)
 		hospitalBucket := hashBucket(record.Metadata.Hospital)
 		departmentBucket := hashBucket(record.Metadata.Department)
 		uidBucket := hashBucket(record.Metadata.Uid)
+		domainIDBucket := hashBucket(record.Metadata.DomainID)
 		activeBuckets[fmt.Sprintf("disease:%d", diseaseBucket)] = true
 		activeBuckets[fmt.Sprintf("name:%d", nameBucket)] = true
 		activeBuckets[fmt.Sprintf("gender:%d", genderBucket)] = true
 		activeBuckets[fmt.Sprintf("hospital:%d", hospitalBucket)] = true
 		activeBuckets[fmt.Sprintf("department:%d", departmentBucket)] = true
 		activeBuckets[fmt.Sprintf("uid:%d", uidBucket)] = true
-
+		activeBuckets[fmt.Sprintf("domainID:%d", domainIDBucket)] = true
 		// Layer 3: 区块内哈希索引 (Redis Hash)
-		// 为了支持 "Find Tx by Disease\Name\Gender\Hospital\Department\Uid", 结构应为 Hash: Key=Code, Value=List[TxID]
+		// 为了支持 "Find Tx by Disease\Name\Gender\Hospital\Department\Uid\DomainID", 结构应为 Hash: Key=Code, Value=List[TxID]
 		attributeValues := map[string]string{
 			"disease":    record.Metadata.DiseaseCode,
 			"name":       record.Metadata.Name,
@@ -131,6 +141,7 @@ func (s *IndexerService) processBlock(block *common.BlockInfo) {
 			"hospital":   record.Metadata.Hospital,
 			"department": record.Metadata.Department,
 			"uid":        record.Metadata.Uid,
+			"domainID":   record.Metadata.DomainID,
 		}
 		for attr, val := range attributeValues {
 			hashKey := fmt.Sprintf("idx:blk:%d:%s:hash", blockHeight, attr)
@@ -175,13 +186,119 @@ func (s *IndexerService) processBlock(block *common.BlockInfo) {
 	}
 }
 
+// 辅助函数：判断交易是否与医疗数据相关
+// 判断标准：针对 updateDataDigtalEnvelopWithDomain 方法
+// 该方法接收 envelopJsonStr 参数（JSON字符串），其中包含 domainID 字段
+// domainID 的值必须以 DOMAIN_ 开头
+func isMedicalDataTx(tx *common.Transaction) bool {
+	if tx.Payload == nil || len(tx.Payload.Parameters) == 0 {
+		return false
+	}
+
+	// 查找 envelopJsonStr 或 envelop 参数（updateDataDigtalEnvelopWithDomain 的特征参数）
+	var envelopJsonStr string
+	for _, param := range tx.Payload.Parameters {
+		// 检查参数名（可能是 envelopJsonStr 或 envelop，取决于实际调用）
+		if param.Key == "envelopJsonStr" || param.Key == "envelop" {
+			envelopJsonStr = string(param.Value)
+			break
+		}
+	}
+
+	// 如果没有找到 envelopJsonStr 参数，检查是否有直接的 domainID 参数
+	if envelopJsonStr == "" {
+		for _, param := range tx.Payload.Parameters {
+			if param.Key == "domainID" {
+				domainID := string(param.Value)
+				// 检查 domainID 是否以 DOMAIN_ 开头
+				if strings.HasPrefix(domainID, "DOMAIN_") {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	// 解析 envelopJsonStr JSON 字符串，检查其中的 domainID
+	type DataDigtalEnvelop struct {
+		DomainID string `json:"domainID"`
+	}
+
+	var dataEnvelop DataDigtalEnvelop
+	err := json.Unmarshal([]byte(envelopJsonStr), &dataEnvelop)
+	if err != nil {
+		// 如果解析失败，可能不是医疗数据交易
+		return false
+	}
+
+	// 检查 domainID 是否以 DOMAIN_ 开头
+	if strings.HasPrefix(dataEnvelop.DomainID, "DOMAIN_") {
+		return true
+	}
+
+	return false
+}
+
 // 辅助函数：解析交易
 func parseTxPayload(tx *common.Transaction) (*models.OnChainRecord, error) {
 	// 实际项目中需根据合约调用的参数结构解析
-	// 根据合约，数据存储在链上状态中，这里需要从交易参数中解析
-	// 或者从链上状态读取（需要知道 pos）
+	// updateDataDigtalEnvelopWithDomain 方法接收 envelopJsonStr 参数（JSON字符串）
 
-	// 方法1: 从交易参数解析（如果合约直接传递了元数据）
+	// 方法1: 优先处理 updateDataDigtalEnvelopWithDomain 的参数
+	// 查找 envelopJsonStr 或 envelop 参数
+	for _, param := range tx.Payload.Parameters {
+		if param.Key == "envelopJsonStr" || param.Key == "envelop" {
+			envelopJsonStr := string(param.Value)
+
+			// 解析 JSON 字符串为 DataDigtalEnvelop 结构
+			type DataDigtalEnvelop struct {
+				Uid         string `json:"uId"`
+				TimeStamp   string `json:"timeStamp"`
+				Pos         string `json:"pos"`
+				Envelop     string `json:"envelop"`
+				Name        string `json:"name"`
+				Age         int    `json:"age"`
+				Gender      string `json:"gender"`
+				Hospital    string `json:"hospital"`
+				Department  string `json:"department"`
+				DiseaseCode string `json:"diseaseCode"`
+				DomainID    string `json:"domainID"`
+			}
+
+			var dataEnvelop DataDigtalEnvelop
+			err := json.Unmarshal([]byte(envelopJsonStr), &dataEnvelop)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse envelopJsonStr: %v", err)
+			}
+
+			// 转换为 OnChainRecord
+			record := &models.OnChainRecord{
+				TxID: tx.Payload.TxId,
+				Metadata: models.RecordMetadata{
+					Uid:         dataEnvelop.Uid,
+					TimeStamp:   dataEnvelop.TimeStamp,
+					Pos:         dataEnvelop.Pos,
+					Envelop:     dataEnvelop.Envelop,
+					Name:        dataEnvelop.Name,
+					Age:         dataEnvelop.Age,
+					Gender:      dataEnvelop.Gender,
+					Hospital:    dataEnvelop.Hospital,
+					Department:  dataEnvelop.Department,
+					DiseaseCode: dataEnvelop.DiseaseCode,
+					DomainID:    dataEnvelop.DomainID,
+				},
+			}
+
+			// 验证 domainID 是否存在
+			if record.Metadata.DomainID == "" {
+				return nil, fmt.Errorf("domainID is empty in tx %s", tx.Payload.TxId)
+			}
+
+			return record, nil
+		}
+	}
+
+	// 方法2: 从交易参数解析（如果合约直接传递了元数据）
 	for _, param := range tx.Payload.Parameters {
 		if param.Key == "medical_data" || param.Key == "metadata" {
 			var data models.OnChainRecord
@@ -193,8 +310,7 @@ func parseTxPayload(tx *common.Transaction) (*models.OnChainRecord, error) {
 		}
 	}
 
-	// 方法2: 尝试从其他参数构建（根据实际合约参数结构调整）
-	// 这里假设参数包含元数据字段
+	// 方法3: 尝试从其他参数构建（兼容旧格式）
 	record := &models.OnChainRecord{
 		TxID:     tx.Payload.TxId,
 		Metadata: models.RecordMetadata{},
@@ -230,7 +346,7 @@ func parseTxPayload(tx *common.Transaction) (*models.OnChainRecord, error) {
 	}
 
 	// 如果至少有一个元数据字段，认为解析成功
-	if record.Metadata.DomainID != "" || record.Metadata.DiseaseCode != "" {
+	if record.Metadata.DomainID != "" {
 		return record, nil
 	}
 
@@ -253,4 +369,279 @@ func updateBlockHashIndex(cache map[string]map[string][]string, key, field, txID
 		cache[key] = make(map[string][]string)
 	}
 	cache[key][field] = append(cache[key][field], txID)
+}
+
+// SearchRequest 查询请求参数
+type SearchRequest struct {
+	DomainID    string // 必须：数据域
+	AgeStart    int    // 范围查询条件
+	AgeEnd      int
+	DiseaseCode string // 等值查询条件
+	Name        string // 等值查询条件
+	Gender      string // 等值查询条件
+	Hospital    string // 等值查询条件
+	Department  string // 等值查询条件
+	Uid         string // 等值查询条件
+}
+
+// SearchResult 返回结果
+type SearchResult struct {
+	TxIDs []string `json:"tx_ids"`
+}
+
+// ExecuteQuery 执行多层索引查询
+func (s *IndexerService) ExecuteQuery(req SearchRequest) (*SearchResult, error) {
+	// --- 阶段一：粗粒度筛选 (Layer 1 & 2) ---
+	// 1. 获取数据域位图 Key
+	domainKey := fmt.Sprintf("idx:domain:%s", req.DomainID)
+
+	// 2. 计算属性分桶位图 Keys
+	// 2.1 Age (Range): 涉及多个桶
+	var ageBucketKeys []string
+	if req.AgeStart > 0 || req.AgeEnd > 0 {
+		startBucket := req.AgeStart / AgeBucketSize
+		endBucket := req.AgeEnd / AgeBucketSize
+		for i := startBucket; i <= endBucket; i++ {
+			ageBucketKeys = append(ageBucketKeys, fmt.Sprintf("idx:bucket:age:%d", i))
+		}
+	}
+
+	// 2.2 收集所有等值查询字段的分桶位图 Keys
+	var equalityBucketKeys []string
+	if req.DiseaseCode != "" {
+		equalityBucketKeys = append(equalityBucketKeys, fmt.Sprintf("idx:bucket:disease:%d", hashBucket(req.DiseaseCode)))
+	}
+	if req.Name != "" {
+		equalityBucketKeys = append(equalityBucketKeys, fmt.Sprintf("idx:bucket:name:%d", hashBucket(req.Name)))
+	}
+	if req.Gender != "" {
+		equalityBucketKeys = append(equalityBucketKeys, fmt.Sprintf("idx:bucket:gender:%d", hashBucket(req.Gender)))
+	}
+	if req.Hospital != "" {
+		equalityBucketKeys = append(equalityBucketKeys, fmt.Sprintf("idx:bucket:hospital:%d", hashBucket(req.Hospital)))
+	}
+	if req.Department != "" {
+		equalityBucketKeys = append(equalityBucketKeys, fmt.Sprintf("idx:bucket:department:%d", hashBucket(req.Department)))
+	}
+	if req.Uid != "" {
+		equalityBucketKeys = append(equalityBucketKeys, fmt.Sprintf("idx:bucket:uid:%d", hashBucket(req.Uid)))
+	}
+
+	// 3. 位运算 (BITOP)
+	// 逻辑：Result = DomainBitmap AND (AgeBucket1 OR AgeBucket2...) AND (EqualityBucket1 AND EqualityBucket2...)
+	// Redis BITOP 支持 AND, OR, XOR, NOT
+	var tempKeys []string
+	defer func() {
+		// 清理所有临时Key
+		for _, key := range tempKeys {
+			s.redisClient.Del(s.ctx, key)
+		}
+	}()
+
+	// 3.1 合并 Age Buckets (OR) - 如果有年龄条件
+	var currentResultKey string
+	if len(ageBucketKeys) > 0 {
+		ageUnionKey := "tmp:search:age_union:" + generateRequestID()
+		tempKeys = append(tempKeys, ageUnionKey)
+		_, err := s.redisClient.BitOpOr(s.ctx, ageUnionKey, ageBucketKeys...).Result()
+		if err != nil {
+			return nil, fmt.Errorf("failed to union age buckets: %v", err)
+		}
+		currentResultKey = ageUnionKey
+	} else {
+		// 如果没有年龄条件，从domainKey开始
+		currentResultKey = domainKey
+	}
+
+	// 3.2 合并所有等值查询字段的桶 (AND)
+	for _, bucketKey := range equalityBucketKeys {
+		nextKey := "tmp:search:and_" + generateRequestID()
+		tempKeys = append(tempKeys, nextKey)
+		_, err := s.redisClient.BitOpAnd(s.ctx, nextKey, currentResultKey, bucketKey).Result()
+		if err != nil {
+			return nil, fmt.Errorf("failed to AND bucket: %v", err)
+		}
+		// 如果currentResultKey是临时key，需要清理
+		if currentResultKey != domainKey && strings.HasPrefix(currentResultKey, "tmp:search:") {
+			s.redisClient.Del(s.ctx, currentResultKey)
+		}
+		currentResultKey = nextKey
+	}
+
+	// 3.3 最终与Domain位图合并 (如果还没有合并)
+	if currentResultKey != domainKey {
+		finalDestKey := "tmp:search:final:" + generateRequestID()
+		tempKeys = append(tempKeys, finalDestKey)
+		_, err := s.redisClient.BitOpAnd(s.ctx, finalDestKey, domainKey, currentResultKey).Result()
+		if err != nil {
+			return nil, fmt.Errorf("failed to final AND: %v", err)
+		}
+		// 清理中间结果
+		if currentResultKey != domainKey && strings.HasPrefix(currentResultKey, "tmp:search:") {
+			s.redisClient.Del(s.ctx, currentResultKey)
+		}
+		currentResultKey = finalDestKey
+	}
+
+	// 4. 提取位图中为 1 的位置 (即 Block Heights)
+	candidateBlocks, err := s.getSetBits(currentResultKey)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Phase 1 filtered down to %d blocks", len(candidateBlocks))
+
+	// --- 阶段二：细粒度定位 (Layer 3) ---
+	var resultTxIDs []string
+	for _, height := range candidateBlocks {
+		// 收集该区块内满足所有条件的交易ID列表
+		var candidateTxLists [][]string
+
+		// 1. 查询 Age ZSet (B+ Tree) - 如果有年龄条件
+		if req.AgeStart > 0 || req.AgeEnd > 0 {
+			zsetKey := fmt.Sprintf("idx:blk:%d:age:zset", height)
+			txsByAge, err := s.redisClient.ZRangeByScore(s.ctx, zsetKey, &redis.ZRangeBy{
+				Min: strconv.Itoa(req.AgeStart),
+				Max: strconv.Itoa(req.AgeEnd),
+			}).Result()
+			if err == nil && len(txsByAge) > 0 {
+				candidateTxLists = append(candidateTxLists, txsByAge)
+			} else {
+				// 如果年龄条件不满足，跳过该区块
+				continue
+			}
+		}
+
+		// 2. 查询所有等值查询字段的 Hash 索引
+		equalityFields := []struct {
+			field string
+			value string
+		}{
+			{"disease", req.DiseaseCode},
+			{"name", req.Name},
+			{"gender", req.Gender},
+			{"hospital", req.Hospital},
+			{"department", req.Department},
+			{"uid", req.Uid},
+			{"domainID", req.DomainID},
+		}
+
+		for _, fieldInfo := range equalityFields {
+			if fieldInfo.value == "" {
+				continue
+			}
+			hashKey := fmt.Sprintf("idx:blk:%d:%s:hash", height, fieldInfo.field)
+			val, err := s.redisClient.HGet(s.ctx, hashKey, fieldInfo.value).Result()
+			if err != nil {
+				// 如果某个字段查询失败，说明该区块不满足条件
+				continue
+			}
+			var txsByField []string
+			if err := json.Unmarshal([]byte(val), &txsByField); err == nil && len(txsByField) > 0 {
+				candidateTxLists = append(candidateTxLists, txsByField)
+			} else {
+				// 如果字段值不匹配，跳过该区块
+				continue
+			}
+		}
+
+		// 3. 对所有候选列表求交集
+		if len(candidateTxLists) == 0 {
+			// 如果没有查询条件，返回该区块所有交易（这种情况不应该发生）
+			continue
+		}
+
+		// 从第一个列表开始，依次与其他列表求交集
+		intersection := candidateTxLists[0]
+		for i := 1; i < len(candidateTxLists); i++ {
+			intersection = intersectSlices(intersection, candidateTxLists[i])
+			if len(intersection) == 0 {
+				break
+			}
+		}
+
+		resultTxIDs = append(resultTxIDs, intersection...)
+	}
+
+	return &SearchResult{TxIDs: resultTxIDs}, nil
+}
+
+// GetPosByTxID 根据交易ID获取链上pos信息
+func (s *IndexerService) GetPosByTxID(txID string) (string, error) {
+	if s.chainClient == nil {
+		return "", fmt.Errorf("链客户端未初始化")
+	}
+
+	// 通过交易ID获取交易信息
+	txInfo, err := s.chainClient.GetTxByTxId(txID)
+	if err != nil {
+		return "", fmt.Errorf("获取交易信息失败: %v", err)
+	}
+
+	if txInfo == nil || txInfo.Transaction == nil {
+		return "", fmt.Errorf("交易不存在: %s", txID)
+	}
+
+	record, err := parseTxPayload(txInfo.Transaction)
+	if err != nil {
+		return "", fmt.Errorf("解析交易payload失败: %v", err)
+	}
+	return record.Metadata.Pos, nil
+}
+
+// Helper: 获取 Bitmap 中所有为 1 的 Offset
+// 采用将位图获取到本地，本地运算获取所有为1的位
+func (s *IndexerService) getSetBits(key string) ([]int64, error) {
+	var result []int64
+
+	// 从Redis获取整个位图
+	bitmapBytes, err := s.redisClient.Get(s.ctx, key).Bytes()
+	if err != nil {
+		// 如果key不存在，返回空结果而不是错误
+		if err == redis.Nil {
+			return result, nil
+		}
+		return nil, fmt.Errorf("failed to get bitmap: %v", err)
+	}
+
+	// 遍历每个字节
+	for byteIndex, byteVal := range bitmapBytes {
+		// 如果字节为0，跳过（该字节内没有为1的位）
+		if byteVal == 0 {
+			continue
+		}
+
+		// 检查该字节内的每一位
+		for bitIndex := 0; bitIndex < 8; bitIndex++ {
+			// 检查第bitIndex位是否为1
+			if byteVal&(1<<bitIndex) != 0 {
+				// 计算该位在整个位图中的位置
+				bitPos := int64(byteIndex*8 + 7 - bitIndex)
+				result = append(result, bitPos)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// Helper: 切片交集
+func intersectSlices(a, b []string) []string {
+	m := make(map[string]bool)
+	for _, item := range a {
+		m[item] = true
+	}
+	var res []string
+	for _, item := range b {
+		if m[item] {
+			res = append(res, item)
+		}
+	}
+	return res
+}
+
+func generateRequestID() string {
+	h := fnv.New64()
+	h.Write([]byte(strconv.FormatInt(time.Now().UnixNano(), 10)))
+	return strconv.FormatUint(h.Sum64(), 10)
 }

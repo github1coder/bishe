@@ -39,6 +39,16 @@
       </t-typography-text>
     </div>
 
+    <div style="margin-top: 20px">
+      <t-form-item label="数据域名" required>
+        <t-input
+          v-model="domainName"
+          placeholder="请输入要上传到的数据域名"
+          clearable
+        />
+      </t-form-item>
+    </div>
+
     <div style="margin-top: 20px; text-align: right">
       <t-button
         @click="lastStep"
@@ -68,6 +78,7 @@ import { MessagePlugin } from "tdesign-vue-next";
 
 const route = useRoute();
 const fileDataList = reactive([]);
+const domainName = ref("");
 
 const PassData = (newVal) => {
   fileDataList.splice(0, fileDataList.length, ...JSON.parse(newVal));
@@ -107,7 +118,11 @@ const confirmResult = () => {
       }
     });
   }
-  emit("confirmResult", JSON.stringify(fileDataList));
+  if (!domainName.value || domainName.value.trim() === "") {
+    MessagePlugin.warning("请输入数据域名", 3000);
+    return;
+  }
+  emit("confirmResult", JSON.stringify(fileDataList), domainName.value.trim());
 };
 
 // 下载txt文件

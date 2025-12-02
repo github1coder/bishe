@@ -74,10 +74,10 @@ const initFileOK = (jsonSuccessFileDataList) => {
 };
 
 // 第二步确认了转换结果
-const confirmResult = (jsonSuccessFileDataList) => {
+const confirmResult = (jsonSuccessFileDataList, domainName) => {
   nextStep();
-  // 将jsonSuccessFileDataList传递到下一步
-  uploadToIPFSRef.value.PassData(jsonSuccessFileDataList);
+  // 将jsonSuccessFileDataList和domainName传递到下一步
+  uploadToIPFSRef.value.PassData(jsonSuccessFileDataList, domainName);
 };
 
 const UserIdCheckAndSetDialogRef = ref(null);

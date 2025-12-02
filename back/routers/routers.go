@@ -72,6 +72,7 @@ func SetupRouter() *gin.Engine {
 		queryGroup := apiGroup.Group("/query")
 		{
 			queryGroup.POST("/queryData", controller.QueryDataHandler)
+			queryGroup.POST("/queryByFields", controller.QueryByFieldsHandler)
 		}
 
 		logGroup := apiGroup.Group("/log")

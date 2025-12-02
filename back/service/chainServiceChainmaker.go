@@ -80,7 +80,7 @@ func UploadEnvelopeToBlockchainWithDomain4Chainmaker(contractName string, envelo
 		ContractName: contractName,
 		MethodName:   "updateDataDigtalEnvelopWithDomain",
 		Args: map[string]interface{}{
-			"envelop": envelopJsonStr,
+			"envelopJsonStr": envelopJsonStr,
 		},
 	}
 

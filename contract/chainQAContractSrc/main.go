@@ -574,7 +574,7 @@ func (f *ChainQA) checkAccess() protogo.Response {
 	if allowed {
 		return sdk.Success([]byte("true"))
 	}
-	return sdk.Error("Access Denied") // 或者返回 sdk.Success([]byte("false")) 取决于网关如何处理
+	return sdk.Success([]byte("false")) // 或者返回 sdk.Success([]byte("false")) 取决于网关如何处理
 }
 
 // verifyPolicy 纯逻辑校验函数

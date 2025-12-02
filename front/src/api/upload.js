@@ -38,3 +38,26 @@ export function uploadFile(aesKey, fileContent, fileName) {
         },
     })
 }
+
+export function uploadFileWithDomain(aesKey, fileContent, fileName, domainName) {
+    const apiStore = useApiStore()
+    const userStore = useUserStore()
+    return request({
+        url: baseUrl + '/uploadFileWithDomain',
+        method: 'post',
+        data: {
+            uId: userStore.userId,
+            aesKey: aesKey,
+            fileContent: fileContent,
+            fileName: fileName,
+            domainName: domainName,
+            orgId: userStore.orgId,
+            role: userStore.role,
+            apiUrl: {
+                ipfsServiceUrl: apiStore.ipfsServiceUrl,
+                chainServiceUrl: apiStore.chainServiceUrl,
+                contractName: apiStore.contractName,
+            }
+        },
+    })
+}

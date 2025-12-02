@@ -5,8 +5,10 @@ package main
 
 import (
 	"chainqa_offchain_demo/chain"
+	"chainqa_offchain_demo/indexer"
 	"chainqa_offchain_demo/routers"
 	"chainqa_offchain_demo/setting"
+	"context"
 	"log"
 
 	"fmt"
@@ -30,20 +32,26 @@ func main() {
 		return
 	}
 
-	// chainClient, err := chain.InitChainClient("")
-	_, err := chain.InitChainClient("")
+	// 初始化链客户端
+	chainClient, err := chain.InitChainClient("")
 	if err != nil {
 		log.Fatalf("初始化链客户端失败: %v", err)
 	}
 
-	// // 初始化索引服务
-	// indexerSvc, err := indexer.NewIndexerService(chainClient, ctx)
-	// if err != nil {
-	// 	log.Fatalf("初始化索引服务失败: %v", err)
-	// }
+	// 创建 context（用于区块监听和 Redis 操作）
+	ctx := context.Background()
 
-	// // 启动区块监听
-	// go indexerSvc.StartBlockListener()
+	// 初始化索引服务
+	indexerSvc, err := indexer.NewIndexerService(chainClient, ctx)
+	if err != nil {
+		log.Fatalf("初始化索引服务失败: %v", err)
+	}
+
+	// 设置全局索引服务实例
+	indexer.GlobalIndexerService = indexerSvc
+
+	// 启动区块监听
+	go indexerSvc.StartBlockListener()
 
 	// 注册路由
 	r := routers.SetupRouter()

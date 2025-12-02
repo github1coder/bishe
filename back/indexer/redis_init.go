@@ -7,7 +7,7 @@ import (
 
 	"chainqa_offchain_demo/setting"
 
-	"chainmaker.org/chainmaker/sdk-go/v2"
+	sdk "chainmaker.org/chainmaker/sdk-go/v2"
 	"github.com/go-redis/redis/v8"
 )
 
@@ -36,7 +36,7 @@ func InitRedisClient(ctx context.Context) (*redis.Client, error) {
 	// 创建客户端
 	client := redis.NewClient(options)
 
-	// 测试连接
+	// 测试连接（使用 context.Background()，因为初始化时不需要外部超时控制）
 	_, err := client.Ping(ctx).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)

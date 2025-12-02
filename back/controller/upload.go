@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,15 +39,15 @@ type UploadFileDTOWithDomain struct {
 	FileContent string    `json:"fileContent"` // 文件内容
 	FileName    string    `json:"fileName"`
 	Uid         string    `json:"uId"`
-	Name        string    `json:"name"`        //用户姓名
-	Age         int       `json:"age"`         //年龄
-	Gender      string    `json:"gender"`      //性别
-	Hospital    string    `json:"hospital"`    //医院
-	Department  string    `json:"department"`  //科室
-	DiseaseCode string    `json:"diseaseCode"` //疾病代码
-	DomainName  string    `json:"domainName"`  // 数据域名称
-	OrgId       string    `json:"orgId"`       // 组织ID
-	Role        string    `json:"role"`        // 角色
+	// Name        string    `json:"name"`        //用户姓名
+	// Age         int       `json:"age"`         //年龄
+	// Gender      string    `json:"gender"`      //性别
+	// Hospital    string    `json:"hospital"`    //医院
+	// Department  string    `json:"department"`  //科室
+	// DiseaseCode string    `json:"diseaseCode"` //疾病代码
+	DomainName string `json:"domainName"` // 数据域名称
+	OrgId      string `json:"orgId"`      // 组织ID
+	Role       string `json:"role"`       // 角色
 }
 
 // 数字信封
@@ -62,6 +63,16 @@ type DataDigtalEnvelop struct {
 	Department  string `json:"department"`  //科室
 	DiseaseCode string `json:"diseaseCode"` //疾病代码
 	DomainID    string `json:"domainID"`    //数据域ID
+}
+
+// 记录信息结构体
+type RecordInfo struct {
+	Name        string
+	Age         int
+	Gender      string
+	Hospital    string
+	Department  string
+	DiseaseCode string
 }
 
 // hello
@@ -201,15 +212,15 @@ func UploadFileWithDomainHandler(c *gin.Context) {
 	req.FileName = strings.TrimSpace(req.FileName)       // 去除空格
 	req.FileContent = strings.TrimSpace(req.FileContent) // 去除空格
 	req.AesKey = strings.TrimSpace(req.AesKey)           // 去除空格
-	req.Name = strings.TrimSpace(req.Name)               // 去除空格
-	req.Age = int(req.Age)                               // 去除空格
-	req.Gender = strings.TrimSpace(req.Gender)           // 去除空格
-	req.Hospital = strings.TrimSpace(req.Hospital)       // 去除空格
-	req.Department = strings.TrimSpace(req.Department)   // 去除空格
-	req.DiseaseCode = strings.TrimSpace(req.DiseaseCode) // 去除空格
-	req.DomainName = strings.TrimSpace(req.DomainName)   // 去除空格
-	req.OrgId = strings.TrimSpace(req.OrgId)             // 去除空格
-	req.Role = strings.TrimSpace(req.Role)               // 去除空格
+	// req.Name = strings.TrimSpace(req.Name)               // 去除空格
+	// req.Age = int(req.Age)                               // 去除空格
+	// req.Gender = strings.TrimSpace(req.Gender)           // 去除空格
+	// req.Hospital = strings.TrimSpace(req.Hospital)       // 去除空格
+	// req.Department = strings.TrimSpace(req.Department)   // 去除空格
+	// req.DiseaseCode = strings.TrimSpace(req.DiseaseCode) // 去除空格
+	req.DomainName = strings.TrimSpace(req.DomainName) // 去除空格
+	req.OrgId = strings.TrimSpace(req.OrgId)           // 去除空格
+	req.Role = strings.TrimSpace(req.Role)             // 去除空格
 	uploadHandlerWithDomain(req, c)
 }
 
@@ -224,7 +235,23 @@ func uploadHandlerWithDomain(req UploadFileDTOWithDomain, c *gin.Context) {
 		models.ResponseError400(c, http.StatusBadRequest, "没有权限", nil)
 		return
 	}
-	// 2. 使用AES密钥加密文件内容
+
+	// 2. 解析FileContent为记录列表
+	records, err := parseFileContentToRecords(req.FileContent)
+	if err != nil {
+		type UploadFileErrorVO struct {
+			FileName string `json:"fileName"` // 文件名
+			Error    string `json:"error"`    // 错误信息
+		}
+		var errorVO UploadFileErrorVO
+		errorVO.FileName = req.FileName
+		errorVO.Error = err.Error()
+		models.ResponseError400(c, http.StatusBadRequest, fmt.Sprintf("解析文件内容失败: %s", req.FileName), errorVO)
+		return
+	}
+	fmt.Printf("解析到 %d 条记录\n", len(records))
+
+	// 3. 使用AES密钥加密文件内容
 	cipherText, err := service.AesEncrypt(req.FileContent, req.AesKey)
 
 	type UploadFileErrorVO struct {
@@ -240,7 +267,7 @@ func uploadHandlerWithDomain(req UploadFileDTOWithDomain, c *gin.Context) {
 	}
 	fmt.Println("cipherText:", cipherText)
 
-	// 3. 将加密后的文件内容上传到IPFS
+	// 4. 将加密后的文件内容上传到IPFS
 	cid, err := service.HandleUploadIPFSFile(cipherText, req.ApiUrl.IpfsServiceUrl) // 调用HandleUploadIPFSFile方法上传文件
 	if err != nil {
 		errorVO.Error = err.Error()
@@ -249,8 +276,7 @@ func uploadHandlerWithDomain(req UploadFileDTOWithDomain, c *gin.Context) {
 	}
 	fmt.Println("cid:", cid)
 
-	// 4. 上传数字信封
-	// 从区块链中获取公钥
+	// 5. 从区块链中获取公钥
 	publicKey, err := service.GetPublicKeyFromBlockchain(req.ApiUrl.ContractName, req.ApiUrl.ChainServiceUrl)
 	if err != nil {
 		errorVO.Error = err.Error()
@@ -258,6 +284,7 @@ func uploadHandlerWithDomain(req UploadFileDTOWithDomain, c *gin.Context) {
 		return
 	}
 
+	// 6. 生成数字信封
 	Envelope, err := service.RSAEncryptAndReturnEnvelop(req.ApiUrl.ContractName, req.AesKey, publicKey)
 	if err != nil {
 		errorVO.Error = err.Error()
@@ -265,51 +292,106 @@ func uploadHandlerWithDomain(req UploadFileDTOWithDomain, c *gin.Context) {
 		return
 	}
 	fmt.Println("Envelope:", Envelope)
-	// 等待1s
-	time.Sleep(2000 * time.Millisecond) // 延时1s
-	fmt.Println("开始上传数字信封到区块链")
-	// 将数字信封上传到区块链
-	var dataDigtalEnvelop DataDigtalEnvelop
-	dataDigtalEnvelop = DataDigtalEnvelop{
-		Uid:         req.Uid,
-		Pos:         cid,
-		Envelop:     Envelope,
-		Name:        req.Name,
-		Age:         int(req.Age),
-		Gender:      req.Gender,
-		Hospital:    req.Hospital,
-		Department:  req.Department,
-		DiseaseCode: req.DiseaseCode,
-		DomainID:    "DOMAIN_" + req.DomainName,
+
+	// 等待2秒，确保IPFS同步
+	time.Sleep(2000 * time.Millisecond)
+	fmt.Println("开始批量上传数字信封到区块链")
+
+	// 7. 为每条记录生成数字信封并上传
+	type UploadResult struct {
+		RecordIndex int    `json:"recordIndex"` // 记录索引（从1开始）
+		Success     bool   `json:"success"`     // 是否成功
+		Error       string `json:"error"`       // 错误信息（如果失败）
+		Name        string `json:"name"`        // 记录中的姓名
 	}
 
-	envelopJsonBytes, err := json.Marshal(dataDigtalEnvelop)
-	if err != nil {
-		errorVO.Error = err.Error()
-		models.ResponseError400(c, http.StatusBadRequest, fmt.Sprintf("序列化数字信封失败: %s", req.FileName), errorVO)
-		return
-	}
-	envelopJsonStr := string(envelopJsonBytes)
-	fmt.Println("dataDigtalEnvelop json:", envelopJsonStr)
+	var uploadResults []UploadResult
+	successCount := 0
+	failCount := 0
 
-	err = service.UploadEnvelopeToBlockchainWithDomain(req.ApiUrl.ContractName, req.ApiUrl.ChainServiceUrl, envelopJsonStr)
-	if err != nil {
-		errorVO.Error = err.Error()
-		models.ResponseError400(c, http.StatusBadRequest, fmt.Sprintf("上传数字信封到区块链失败: %s", req.FileName), errorVO)
-		return
-	}
-	fmt.Println("上传数字信封到区块链成功")
+	for i, record := range records {
+		// 构建数字信封数据
+		var dataDigtalEnvelop DataDigtalEnvelop
+		dataDigtalEnvelop = DataDigtalEnvelop{
+			Uid:         req.Uid,
+			Pos:         cid,
+			Envelop:     Envelope,
+			Name:        record.Name,
+			Age:         record.Age,
+			Gender:      record.Gender,
+			Hospital:    record.Hospital,
+			Department:  record.Department,
+			DiseaseCode: record.DiseaseCode,
+			DomainID:    "DOMAIN_" + req.DomainName,
+		}
 
-	// 4. 返回文件上传结果
+		envelopJsonBytes, err := json.Marshal(dataDigtalEnvelop)
+		if err != nil {
+			uploadResults = append(uploadResults, UploadResult{
+				RecordIndex: i + 1,
+				Success:     false,
+				Error:       fmt.Sprintf("序列化数字信封失败: %v", err),
+				Name:        record.Name,
+			})
+			failCount++
+			fmt.Printf("第 %d 条记录序列化失败: %v\n", i+1, err)
+			continue
+		}
+		envelopJsonStr := string(envelopJsonBytes)
+
+		// 上传数字信封到区块链
+		err = service.UploadEnvelopeToBlockchainWithDomain(req.ApiUrl.ContractName, req.ApiUrl.ChainServiceUrl, envelopJsonStr)
+		if err != nil {
+			uploadResults = append(uploadResults, UploadResult{
+				RecordIndex: i + 1,
+				Success:     false,
+				Error:       fmt.Sprintf("上传数字信封到区块链失败: %v", err),
+				Name:        record.Name,
+			})
+			failCount++
+			fmt.Printf("第 %d 条记录上传失败: %v\n", i+1, err)
+		} else {
+			uploadResults = append(uploadResults, UploadResult{
+				RecordIndex: i + 1,
+				Success:     true,
+				Error:       "",
+				Name:        record.Name,
+			})
+			successCount++
+			fmt.Printf("第 %d 条记录上传成功: %s\n", i+1, record.Name)
+		}
+
+		// 每条记录之间稍作延时，避免请求过快
+		if i < len(records)-1 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	fmt.Printf("批量上传完成：成功 %d 条，失败 %d 条\n", successCount, failCount)
+
+	// 8. 返回文件上传结果
 	type UploadFileSuccessVO struct {
-		FileName string `json:"fileName"` // 文件名
-		Pos      string `json:"pos"`      // ipfs地址
+		FileName     string         `json:"fileName"`     // 文件名
+		Pos          string         `json:"pos"`          // ipfs地址
+		TotalRecords int            `json:"totalRecords"` // 总记录数
+		SuccessCount int            `json:"successCount"` // 成功数量
+		FailCount    int            `json:"failCount"`    // 失败数量
+		Results      []UploadResult `json:"results"`      // 详细结果
 	}
 
 	var successVO UploadFileSuccessVO
 	successVO.FileName = req.FileName
 	successVO.Pos = cid
-	models.ResponseOK(c, fmt.Sprintf("上传文件%s到IPFS成功", req.FileName), successVO)
+	successVO.TotalRecords = len(records)
+	successVO.SuccessCount = successCount
+	successVO.FailCount = failCount
+	successVO.Results = uploadResults
+
+	if failCount == 0 {
+		models.ResponseOK(c, fmt.Sprintf("成功上传文件%s的%d条记录到IPFS和区块链", req.FileName, len(records)), successVO)
+	} else {
+		models.ResponseOK(c, fmt.Sprintf("文件%s上传完成：成功%d条，失败%d条", req.FileName, successCount, failCount), successVO)
+	}
 }
 
 func UploadDataFileWithoutCheckHandler(c *gin.Context) {
@@ -619,4 +701,95 @@ func changeToFileContentString(fileContent [][]string) string {
 	// 去除空格
 	s = strings.TrimSpace(s)
 	return s
+}
+
+// 解析FileContent字符串为记录列表
+// FileContent格式：第一行是表头（name age gender hospital department diseasecode），后续行是数据
+func parseFileContentToRecords(fileContent string) ([]RecordInfo, error) {
+	lines := strings.Split(strings.TrimSpace(fileContent), "\n")
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("文件内容为空")
+	}
+
+	// 解析表头，找到各字段的索引位置
+	headerLine := strings.TrimSpace(lines[0])
+	headerFields := strings.Fields(headerLine) // 使用Fields可以处理多个空格
+
+	// 创建字段名到索引的映射（不区分大小写，并处理下划线和驼峰命名）
+	fieldIndexMap := make(map[string]int)
+	for i, field := range headerFields {
+		fieldLower := strings.ToLower(strings.TrimSpace(field))
+		// 将下划线替换为空，以便匹配 "disease_code" 和 "diseaseCode"
+		fieldNormalized := strings.ReplaceAll(fieldLower, "_", "")
+		fieldIndexMap[fieldLower] = i
+		fieldIndexMap[fieldNormalized] = i
+	}
+
+	// 查找必需字段的索引（支持多种命名方式）
+	nameIdx, hasName := fieldIndexMap["name"]
+	ageIdx, hasAge := fieldIndexMap["age"]
+	genderIdx, hasGender := fieldIndexMap["gender"]
+	hospitalIdx, hasHospital := fieldIndexMap["hospital"]
+	departmentIdx, hasDepartment := fieldIndexMap["department"]
+
+	// diseaseCode 支持多种命名：diseasecode, disease_code, diseaseCode
+	diseaseCodeIdx, hasDiseaseCode := fieldIndexMap["diseasecode"]
+	if !hasDiseaseCode {
+		diseaseCodeIdx, hasDiseaseCode = fieldIndexMap["disease_code"]
+	}
+	if !hasDiseaseCode {
+		diseaseCodeIdx, hasDiseaseCode = fieldIndexMap["diseasecode"]
+	}
+
+	// 如果表头中没有找到这些字段，尝试按顺序解析（假设顺序为：name age gender hospital department diseasecode）
+	if !hasName || !hasAge || !hasGender || !hasHospital || !hasDepartment || !hasDiseaseCode {
+		// 如果表头字段数至少为6，假设按顺序排列
+		if len(headerFields) >= 6 {
+			nameIdx = 0
+			ageIdx = 1
+			genderIdx = 2
+			hospitalIdx = 3
+			departmentIdx = 4
+			diseaseCodeIdx = 5
+		} else {
+			return nil, fmt.Errorf("表头字段不完整，需要包含：name, age, gender, hospital, department, diseasecode")
+		}
+	}
+
+	// 解析数据行
+	var records []RecordInfo
+	for i := 1; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue // 跳过空行
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) < 6 {
+			return nil, fmt.Errorf("第 %d 行数据字段不足，需要至少6个字段", i+1)
+		}
+
+		// 解析age字段（转换为整数）
+		age, err := strconv.Atoi(strings.TrimSpace(fields[ageIdx]))
+		if err != nil {
+			return nil, fmt.Errorf("第 %d 行age字段格式错误: %v", i+1, err)
+		}
+
+		record := RecordInfo{
+			Name:        strings.TrimSpace(fields[nameIdx]),
+			Age:         age,
+			Gender:      strings.TrimSpace(fields[genderIdx]),
+			Hospital:    strings.TrimSpace(fields[hospitalIdx]),
+			Department:  strings.TrimSpace(fields[departmentIdx]),
+			DiseaseCode: strings.TrimSpace(fields[diseaseCodeIdx]),
+		}
+
+		records = append(records, record)
+	}
+
+	if len(records) == 0 {
+		return nil, fmt.Errorf("没有找到有效的数据记录")
+	}
+
+	return records, nil
 }
